@@ -37,11 +37,6 @@ Libraries: <dirent.h>, <unistd.h>, <sys/types.h>, <signal.h>
 
 Data Source: /proc filesystem
 
-🧩 Installation and Execution
-# Clone the repository
-git clone https://github.com/your-username/system-monitor-cpp.git
-cd system-monitor-cpp
-
 # Compile (example for Day 5)
 g++ -std=c++17 Day5.cpp -o sysmon
 
