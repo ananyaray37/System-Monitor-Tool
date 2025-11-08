@@ -1,0 +1,39 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+
+string read_file_first_line(const string &path){
+ifstream f(path);
+if(!f) return string();
+string line; getline(f, line);
+return line;
+}
+
+
+long long parse_mem_kb(const string &key){
+ifstream f("/proc/meminfo");
+string line;
+while(getline(f,line)){
+if(line.find(key)==0){
+// format: Key: 123456 kB
+stringstream ss(line);
+string k; long long val; string unit;
+ss>>k>>val>>unit;
+return val; // in kB
+}
+}
+return 0;
+}
+
+
+int main(){
+cout<<"Day1 - System Monitor: Basic stats (Linux /proc)"<<"\n\n";
+string load = read_file_first_line("/proc/loadavg");
+long long mem_total_kb = parse_mem_kb("MemTotal:");
+long long mem_free_kb = parse_mem_kb("MemFree:");
+cout<<"Loadavg: "<< (load.empty()?"N/A":load) <<"\n";
+cout<<"MemTotal: "<<mem_total_kb<<" kB\n";
+cout<<"MemFree: "<<mem_free_kb<<" kB\n";
+cout<<"\nNote: This is Day1 output. Use Day2...Day5 for more features.\n";
+return 0;
+}
