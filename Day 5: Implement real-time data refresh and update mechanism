@@ -1,0 +1,36 @@
+#include <bits/stdc++.h>
+#include <signal.h>
+#include <unistd.h>
+using namespace std;
+
+
+struct P5{int pid; string name; unsigned long cpu; long rss;};
+
+
+vector<P5> snap(){ vector<P5> out; DIR *d = opendir("/proc"); if(!d) return out; struct dirent *e; while((e=readdir(d))){ if(e->d_type!=DT_DIR) continue; string s = e->d_name; if(!all_of(s.begin(), s.end(), ::isdigit)) continue; int pid=stoi(s); string statp = "/proc/"+s+"/stat"; ifstream fs(statp); if(!fs) continue; string line; getline(fs,line); size_t p1=line.find('('), p2=line.rfind(')'); string comm = (p1!=string::npos && p2!=string::npos)? line.substr(p1+1,p2-p1-1):""; string after=line.substr(p2+2); stringstream ss(after); vector<string> t; string tok; while(ss>>tok) t.push_back(tok); unsigned long ut=0, st=0; long rss_pages=0; if(t.size()>=15){ ut=stoul(t[13]); st=stoul(t[14]); if(t.size()>=23) rss_pages=stol(t[21]); } long page_kb=sysconf(_SC_PAGESIZE)/1024; long rss_kb=rss_pages*page_kb; out.push_back({pid,comm,ut+st,rss_kb}); } closedir(d); return out; }
+
+
+void clear_screen(){ cout<<"\033[2J\033[H"; }
+
+
+int main(int argc,char**argv){
+int interval = 2; string sortby = "cpu";
+if(argc>1) interval = stoi(argv[1]);
+for(int i=2;i<argc;i++){ string a=argv[i]; if(a.rfind("--sort=",0)==0) sortby=a.substr(7); }
+while(true){
+auto procs = snap();
+if(sortby=="cpu") sort(procs.begin(), procs.end(), [](auto &a, auto &b){ return a.cpu>b.cpu; });
+else sort(procs.begin(), procs.end(), [](auto &a, auto &b){ return a.rss>b.rss; });
+clear_screen();
+cout<<"Day5 - Live System Monitor (hit Ctrl+C to exit)\n";
+// basic memory and load
+string load; ifstream fl("/proc/loadavg"); if(fl) getline(fl,load); long long memtot=0, memfree=0; ifstream fm("/proc/meminfo"); string line; while(getline(fm,line)){ if(line.find("MemTotal:")==0){ stringstream ss(line); string k; ss>>k>>memtot; } if(line.find("MemAvailable:")==0){ stringstream ss(line); string k; ss>>k>>memfree; } }
+cout<<"Loadavg: "<<(load.empty()?"N/A":load)<<"\n";
+cout<<"MemTotal: "<<memtot<<" kB, MemAvailable: "<<memfree<<" kB\n\n";
+cout<<left<<setw(8)<<"PID"<<setw(30)<<"NAME"<<setw(12)<<"CPU_TICKS"<<setw(12)<<"RSS_kB"<<"\n";
+for(size_t i=0;i<min<size_t>(procs.size(), 20); ++i){ auto &p = procs[i]; cout<<left<<setw(8)<<p.pid<<setw(30)<<p.name<<setw(12)<<p.cpu<<setw(12)<<p.rss<<"\n"; }
+cout<<"\nRefreshing in "<<interval<<" seconds..."<<flush;
+sleep(interval);
+}
+return 0;
+}
