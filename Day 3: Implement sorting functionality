@@ -1,19 +1,36 @@
 #include <bits/stdc++.h>
-#include <signal.h>
 using namespace std;
 
 
-struct P4{int pid; string name; unsigned long cpu; long rss;};
+struct ProcInfo3{int pid; string name; unsigned long cpu_ticks; long rss_kb;};
 
 
-vector<P4> snapshot(){ vector<P4> out; DIR *d = opendir("/proc"); if(!d) return out; struct dirent *e; while((e=readdir(d))){ if(e->d_type!=DT_DIR) continue; string s = e->d_name; if(!all_of(s.begin(), s.end(), ::isdigit)) continue; int pid=stoi(s); string statp = "/proc/"+s+"/stat"; ifstream fs(statp); if(!fs) continue; string line; getline(fs,line); size_t p1=line.find('('), p2=line.rfind(')'); string comm = (p1!=string::npos && p2!=string::npos)? line.substr(p1+1,p2-p1-1):""; string after=line.substr(p2+2); stringstream ss(after); vector<string> t; string tok; while(ss>>tok) t.push_back(tok); unsigned long ut=0, st=0; long rss_pages=0; if(t.size()>=15){ ut=stoul(t[13]); st=stoul(t[14]); if(t.size()>=23) rss_pages=stol(t[21]); } long page_kb=sysconf(_SC_PAGESIZE)/1024; long rss_kb=rss_pages*page_kb; out.push_back({pid,comm,ut+st,rss_kb}); } closedir(d); return out; }
+vector<ProcInfo3> get_procs(){
+vector<ProcInfo3> out;
+DIR *d = opendir("/proc"); if(!d) return out; struct dirent *e;
+while((e = readdir(d))){ if(e->d_type!=DT_DIR) continue; string s = e->d_name; if(!all_of(s.begin(), s.end(), ::isdigit)) continue; int pid = stoi(s);
+string statpath = "/proc/"+s+"/stat"; ifstream fs(statpath); if(!fs) continue; string line; getline(fs,line);
+size_t p1 = line.find('('), p2 = line.rfind(')'); string comm = (p1!=string::npos && p2!=string::npos)? line.substr(p1+1,p2-p1-1):""; string after = line.substr(p2+2);
+stringstream ss(after); vector<string> toks; string t; while(ss>>t) toks.push_back(t);
+unsigned long utime=0, stime=0; long rss_pages=0; if(toks.size()>=15){ utime = stoul(toks[13]); stime = stoul(toks[14]); if(toks.size()>=23) rss_pages = stol(toks[21]); }
+long page_kb = sysconf(_SC_PAGESIZE)/1024; long rss_kb = rss_pages * page_kb;
+out.push_back({pid, comm, utime+stime, rss_kb});
+}
+closedir(d); return out;
+}
 
 
-int main(){
-cout<<"Day4 - Kill processes (interactive)"<<"\n";
-auto procs = snapshot(); sort(procs.begin(), procs.end(), [](auto &a, auto &b){ return a.cpu>b.cpu; });
+int main(int argc, char** argv){
+string sortby = "cpu"; // default
+for(int i=1;i<argc;i++){
+string a = argv[i]; if(a.rfind("--sort=",0)==0) sortby = a.substr(7);
+}
+auto procs = get_procs();
+if(sortby=="cpu") sort(procs.begin(), procs.end(), [](auto &a, auto &b){ return a.cpu_ticks>b.cpu_ticks; });
+else if(sortby=="mem") sort(procs.begin(), procs.end(), [](auto &a, auto &b){ return a.rss_kb>b.rss_kb; });
+cout<<"Day3 - Sorted process list (sort="<<sortby<<")\n";
 cout<<left<<setw(8)<<"PID"<<setw(30)<<"NAME"<<setw(12)<<"CPU_TICKS"<<setw(12)<<"RSS_kB"<<"\n";
-for(size_t i=0;i<min<size_t>(procs.size(),50);++i){ auto &p=procs[i]; cout<<left<<setw(8)<<p.pid<<setw(30)<<p.name<<setw(12)<<p.cpu<<setw(12)<<p.rss<<"\n"; }
-cout<<"\nEnter PID to signal (or 0 to exit): "; int pid; if(!(cin>>pid) || pid==0) return 0; cout<<"Signal number to send (e.g. 15=TERM,9=KILL): "; int sig; cin>>sig; if(kill(pid, sig)==0) cout<<"Signal sent.\n"; else perror("kill");
+for(size_t i=0;i<min<size_t>(procs.size(),100);++i){ auto &p = procs[i]; cout<<left<<setw(8)<<p.pid<<setw(30)<<p.name<<setw(12)<<p.cpu_ticks<<setw(12)<<p.rss_kb<<"\n"; }
+cout<<"\nTotal: "<<procs.size()<<"\n";
 return 0;
 }
