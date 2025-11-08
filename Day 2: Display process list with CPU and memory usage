@@ -1,0 +1,59 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+
+struct ProcInfo{int pid; string name; unsigned long utime_ticks; unsigned long stime_ticks; long rss_kb;};
+
+
+vector<ProcInfo> list_processes(){
+vector<ProcInfo> procs;
+DIR *d = opendir("/proc");
+if(!d) return procs;
+struct dirent *entry;
+while((entry = readdir(d))){
+if(entry->d_type!=DT_DIR) continue;
+string dname = entry->d_name;
+if(!all_of(dname.begin(), dname.end(), ::isdigit)) continue;
+int pid = stoi(dname);
+string statpath = "/proc/"+dname+"/stat";
+string statuspath = "/proc/"+dname+"/status";
+ifstream fs(statpath);
+if(!fs) continue;
+string statline; getline(fs, statline);
+// parse stat: pid (comm) state ... utime stime ... rss
+// comm can contain spaces but is inside parentheses
+size_t pos1 = statline.find('(');
+size_t pos2 = statline.rfind(')');
+string comm = (pos1!=string::npos && pos2!=string::npos && pos2>pos1) ? statline.substr(pos1+1,pos2-pos1-1) : "";
+string after = statline.substr(pos2+2); // after ') '
+stringstream ss(after);
+string state; // skip fields until utime (14th) and stime (15th) relative to after
+// fields in 'after' start from field 3 originally; so utime is field 13 of 'after'
+// to keep simple, read tokens into vector
+vector<string> toks; string tok;
+while(ss>>tok) toks.push_back(tok);
+unsigned long utime=0, stime=0; long rss_pages=0;
+if(toks.size()>=15){ utime = stime = 0; utime = stoul(toks[13]); stime = stoul(toks[14]); if(toks.size()>=23) rss_pages = stol(toks[21]); }
+// rss in pages; convert to kB
+long page_kb = sysconf(_SC_PAGESIZE)/1024;
+long rss_kb = rss_pages * page_kb;
+ProcInfo p{pid, comm, utime, stime, rss_kb};
+procs.push_back(p);
+}
+closedir(d);
+return procs;
+}
+
+
+int main(){
+cout<<"Day2 - Process List Snapshot"<<"\n";
+auto procs = list_processes();
+cout<<left<<setw(8)<<"PID"<<setw(25)<<"NAME"<<setw(12)<<"CPU_TICKS"<<setw(12)<<"RSS_kB"<<"\n";
+for(size_t i=0;i<procs.size() && i<50;i++){
+auto &p = procs[i];
+unsigned long cpu = p.utime_ticks + p.stime_ticks;
+cout<<left<<setw(8)<<p.pid<<setw(25)<<p.name<<setw(12)<<cpu<<setw(12)<<p.rss_kb<<"\n";
+}
+cout<<"\nTotal processes: "<<procs.size()<<"\n";
+return 0;
+}
